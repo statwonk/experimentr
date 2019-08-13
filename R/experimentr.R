@@ -7,7 +7,7 @@
 #' @param prior_a length two numeric - (alpha, beta) prior beliefs of each conversion rate
 #' @param prior_b numberic - (alpha, beta) prior beliefs of each conversion rate
 #'
-#' @return belief of chances group a better at each peek
+#' @return a set of experiments from two treatments
 #' @export
 #'
 #' @examples
@@ -24,16 +24,27 @@ perform_experiment <- function(entrants, a_conv, b_conv,
     # see the formula for posterior hyperparameters.
     mutate(group_a_conv_rate_beliefs = map2(cumsum(group_a), 1:n(),
                                             function(x, y) {
-                                              rbeta(1e3, x + prior_a[[1]], y - x + prior_b[[2]])
+                                              rbeta(1e3, x + prior_a[[1]] + 1, y - x + prior_b[[2]] + 1)
                                             })) %>%
     mutate(group_b_conv_rate_beliefs = map2(cumsum(group_b), 1:n(),
                                             function(x, y) {
-                                              rbeta(1e3, x + prior_b[[1]], y - x + prior_b[[2]])
-                                            })) %>%
-    mutate(belief_a_better = map2_dbl(group_a_conv_rate_beliefs, group_b_conv_rate_beliefs,
-                                      function(x, y) {
-                                        mean(x > y)
-                                      })) %>%
+                                              rbeta(1e3, x + prior_b[[1]] + 1, y - x + prior_b[[2]] + 1)
+                                            }))
+}
+
+#' Using posterior beliefs, ask and answer the belief we should have that A has a higher conversion rate.
+#'
+#' @param .experiments
+#'
+#' @return belief of chances group a better at each peek
+#' @export
+#'
+#' @examples
+beliefs_a_is_better <- function(.experiments) {
+  .experiments %>%
+    mutate(belief_a_better = map2_dbl(
+      group_a_conv_rate_beliefs, group_b_conv_rate_beliefs,
+      function(x, y) { mean(x > y) })) %>%
     pull(belief_a_better) -> beliefs_a_better
 
   beliefs_a_better[
